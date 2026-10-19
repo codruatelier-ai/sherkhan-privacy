@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Connect Instagram · Sherkhan Tattoo</title>
+<meta name="description" content="Connect the studio's Facebook Page and Instagram account to Sherkhan, the studio's assistant.">
+<style>
+  :root { --bg: #ffffff; --fg: #1b1b1b; --muted: #5c5c5c; --line: #e3e3e3; --accent: #b3121b; --fb: #1877f2; --ok: #0a7a3e; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #141414; --fg: #ececec; --muted: #a8a8a8; --line: #2c2c2c; --accent: #ff5a5f; --fb: #3b8cff; --ok: #4cc27c; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 1.6rem; line-height: 1.25; margin: 0 0 0.5rem; }
+  h2 { font-size: 1.1rem; margin: 1.5rem 0 0.5rem; }
+  p { margin: 0.5rem 0; }
+  .muted { color: var(--muted); font-size: 0.9rem; }
+  .card { border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; margin: 1.25rem 0; }
+  button { font: 600 1rem/1 inherit; font-family: inherit; border: 0; border-radius: 8px; padding: 14px 20px; cursor: pointer; }
+  .fb { background: var(--fb); color: #fff; display: inline-flex; align-items: center; gap: 10px; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .quiet { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+  button:focus-visible, a:focus-visible { outline: 3px solid var(--fb); outline-offset: 2px; }
+  ul { padding-left: 1.2rem; margin: 0.5rem 0; }
+  li { margin: 2px 0; }
+  .ok { color: var(--ok); font-weight: 600; }
+  .err { color: var(--accent); font-weight: 600; }
+  a { color: var(--accent); }
+  code { font-size: 0.9em; }
+</style>
+</head>
+<body>
+<main>
+<h1>Connect the studio's Instagram</h1>
+<p>Sherkhan is the private assistant of <strong>Sherkhan Tattoo</strong>. It answers simple
+questions in the studio's Instagram messages, alerts the artist about everything else,
+publishes portfolio photos the artist approves, and shows him how the studio's posts
+perform. This page connects the studio's Facebook Page and Instagram account to it.</p>
+
+<div class="card" id="start">
+  <h2>1. Log in</h2>
+  <p>Log in with Facebook and choose the studio's Page and its Instagram account.
+  Facebook shows exactly which permissions the assistant asks for.</p>
+  <p><button type="button" class="fb" id="login" disabled>
+    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M24 12a12 12 0 1 0-13.9 11.9v-8.4H7.1V12h3V9.4c0-3 1.8-4.7 4.5-4.7 1.3 0 2.7.2 2.7.2v2.9h-1.5c-1.5 0-2 .9-2 1.9V12h3.4l-.5 3.5h-2.9v8.4A12 12 0 0 0 24 12z"/></svg>
+    Continue with Facebook</button></p>
+  <p class="muted" id="status" role="status">Loading Facebook Login…</p>
+</div>
+
+<div class="card" id="result" hidden>
+  <h2>2. Connected</h2>
+  <p class="ok" id="who"></p>
+  <h2>Page and Instagram account</h2>
+  <ul id="pages"></ul>
+  <h2>Permissions granted</h2>
+  <ul id="perms"></ul>
+  <p class="muted">Nothing is stored by this page and no access key is shown. The studio's
+  assistant uses its own long-lived key on the studio's computer.</p>
+  <p><button type="button" class="quiet" id="logout">Log out</button></p>
+</div>
+
+<p class="muted"><a href="./">Privacy policy</a> · <a href="delete.html">Delete your data</a> ·
+<a href="terms.html">Terms</a> · Built and operated by Codru Atelier for the studio ·
+codruatelier@gmail.com</p>
+</main>
+
+<script>
+// Both values are public (they appear in every Facebook Login page). Fill them in from the
+// Meta dashboard: App settings → Basic → App ID, and Facebook Login for Business →
+// Configurations → the configuration's id. Sherkhan PLAN-0038.
+const APP_ID = '';
+const CONFIG_ID = '';
+const GRAPH_VERSION = 'v26.0';
+
+const $ = (id) => document.getElementById(id);
+const say = (text, bad) => { $('status').textContent = text; $('status').className = bad ? 'err' : 'muted'; };
+const item = (text) => Object.assign(document.createElement('li'), { textContent: text });
+
+function api(path) {
+  return new Promise((resolve, reject) => FB.api(path, (r) => (!r || r.error ? reject(r && r.error) : resolve(r))));
+}
+
+async function showConnected() {
+  try {
+    const [me, perms, pages] = await Promise.all([
+      api('/me?fields=name'),
+      api('/me/permissions'),
+      api('/me/accounts?fields=name,instagram_business_account{username,name}'),
+    ]);
+    $('who').textContent = `Logged in as ${me.name}.`;
+    const list = pages.data || [];
+    $('pages').replaceChildren(...(list.length ? list.map((p) => item(p.instagram_business_account
+      ? `${p.name} → Instagram @${p.instagram_business_account.username}`
+      : `${p.name} (no Instagram account linked)`)) : [item('No Page was shared. Log in again and choose the studio\'s Page.')]));
+    const granted = (perms.data || []).filter((p) => p.status === 'granted').map((p) => p.permission).sort();
+    const declined = (perms.data || []).filter((p) => p.status !== 'granted').map((p) => `${p.permission} (declined)`);
+    $('perms').replaceChildren(...[...granted, ...declined].map(item));
+    $('start').hidden = true;
+    $('result').hidden = false;
+  } catch (e) {
+    say(`Facebook answered with an error: ${(e && e.message) || 'unknown'}. Log in again.`, true);
+  }
+}
+
+function login() {
+  say('Waiting for Facebook…');
+  FB.login((res) => {
+    if (res && res.authResponse) showConnected();
+    else say('Login was cancelled. Press the button to try again.');
+  }, { config_id: CONFIG_ID });
+}
+
+if (!APP_ID || !CONFIG_ID) {
+  say('This page is not configured yet: the App ID and the login configuration id are still empty.', true);
+} else {
+  window.fbAsyncInit = () => {
+    FB.init({ appId: APP_ID, cookie: false, xfbml: false, version: GRAPH_VERSION });
+    $('login').disabled = false;
+    say('Ready.');
+    FB.getLoginStatus((r) => { if (r && r.status === 'connected') showConnected(); });
+  };
+  const s = document.createElement('script');
+  s.src = 'https://connect.facebook.net/en_US/sdk.js';
+  s.async = true; s.defer = true; s.crossOrigin = 'anonymous';
+  s.onerror = () => say('Facebook Login could not load. Check your connection or ad blocker.', true);
+  document.head.append(s);
+  $('login').addEventListener('click', login);
+  $('logout').addEventListener('click', () => FB.logout(() => { $('result').hidden = true; $('start').hidden = false; say('Logged out.'); }));
+}
+</script>
+</body>
+</html>
